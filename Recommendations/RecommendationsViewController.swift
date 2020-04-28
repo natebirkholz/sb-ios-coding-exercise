@@ -6,12 +6,32 @@
 import UIKit
 import OHHTTPStubs
 
-struct Recommendation {
-    var imageURL = String()
-    var title = String()
-    var tagline = String()
-    var rating: Float = 0.0
-    var isReleased: Bool = false
+struct Root: Codable {
+    var titles: [Recommendation]
+    var skipped: [String]
+    var titlesOwned: [String]
+    
+    enum CodingKeys: String, CodingKey {
+        case titles
+        case skipped
+        case titlesOwned = "titles_owned"
+    }
+}
+
+struct Recommendation: Codable {
+    let imageURL: String
+    let title: String
+    let tagline: String
+    let rating: Float?
+    let isReleased: Bool
+    
+    enum CodingKeys: String, CodingKey {
+        case imageURL = "image"
+        case title
+        case tagline
+        case rating
+        case isReleased = "is_released"
+    }
 }
 
 class RecommendationsViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
@@ -45,46 +65,22 @@ class RecommendationsViewController: UIViewController, UITableViewDataSource, UI
         let task = session.dataTask(with: request, completionHandler: { (data, response, error) in
             guard let receivedData = data else { return }
             
-            // TASK: This feels gross and smells. Can this json parsing be made more robust and extensible?
+            let jsonDecoder = JSONDecoder()
+            
             do {
-                let json = try JSONSerialization.jsonObject(with: receivedData, options: JSONSerialization.ReadingOptions(rawValue: UInt(0))) as! [String: AnyObject]
+                let root = try jsonDecoder.decode(Root.self, from: receivedData)
                 
-                if let titles = json["titles"] as? [[String: AnyObject]] {
-                    for title in titles {
-                        var recommendation = Recommendation()
-                        
-                        if let name = title["title"] as? String {
-                            recommendation.title = name
-                        }
-                        
-                        if let isReleased = title["is_released"] as? Bool {
-                            recommendation.isReleased = isReleased
-                        }
-                        
-                        if let ratingObj = title["rating"],
-                            let rating = Float("\(ratingObj)") {
-                            recommendation.rating = rating
-                        }
-                        
-                        if let tagline = title["tagline"] as? String {
-                            recommendation.tagline = tagline
-                        }
-                        
-                        if let image = title["image"] as? String {
-                            recommendation.imageURL = image
-                        }
-
-                        self.recommendations.append(recommendation)
-                    }
-                }
+                let filteredRecommendations = self.filteredAndSortedRecommendationsFrom(root)
                 
-                DispatchQueue.main.async {
-                    self.tableView.reloadData()
-                }
+                self.recommendations = filteredRecommendations
+            } catch let error {
+                fatalError(error.localizedDescription)
             }
-            catch {
-                fatalError("Error parsing stubbed json data: \(error)")
+            
+            DispatchQueue.main.async {
+                self.tableView.reloadData()
             }
+            
         });
 
         task.resume()
@@ -92,15 +88,12 @@ class RecommendationsViewController: UIViewController, UITableViewDataSource, UI
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath) as! RecommendationTableViewCell
-        
-        let currentTag = cell.tag + 1
-        cell.tag = currentTag
-        
+                
         let recommendation = recommendations[indexPath.row]
 
         cell.titleLabel.text = recommendation.title
         cell.taglineLabel.text = recommendation.tagline
-        cell.ratingLabel.text = "Rating: \(recommendation.rating)"
+        cell.ratingLabel.text = "Rating: \(recommendation.rating ?? 0.0)"
         
         DispatchQueue.global().async {
             if let url = URL(string: recommendation.imageURL) {
@@ -124,5 +117,17 @@ class RecommendationsViewController: UIViewController, UITableViewDataSource, UI
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         return UITableView.automaticDimension
+    }
+    
+    private func filteredAndSortedRecommendationsFrom(_ root: Root) -> [Recommendation] {
+        let filteredByReleased = root.titles.filter { $0.isReleased }
+        let filteredBySkipped = filteredByReleased.filter { !root.skipped.contains($0.title) }
+        let filteredByOwned = filteredBySkipped.filter { !root.titlesOwned.contains($0.title) }
+        let sorted = filteredByOwned.sorted { $0.rating ?? 0.0 > $1.rating ?? 0.0 }
+        
+        let topTen = Array(sorted.prefix(10))
+        
+        return topTen
+        
     }
 }
