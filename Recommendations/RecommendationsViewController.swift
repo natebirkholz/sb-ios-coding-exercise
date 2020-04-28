@@ -93,18 +93,25 @@ class RecommendationsViewController: UIViewController, UITableViewDataSource, UI
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath) as! RecommendationTableViewCell
         
+        let currentTag = cell.tag + 1
+        cell.tag = currentTag
+        
         let recommendation = recommendations[indexPath.row]
 
         cell.titleLabel.text = recommendation.title
         cell.taglineLabel.text = recommendation.tagline
         cell.ratingLabel.text = "Rating: \(recommendation.rating)"
         
-        if let url = URL(string: recommendation.imageURL) {
-            let data = try? Data(contentsOf: url)
+        DispatchQueue.global().async {
+            if let url = URL(string: recommendation.imageURL) {
+                let data = try? Data(contentsOf: url)
 
-            if let imageData = data {
-                let image = UIImage(data: imageData)
-                cell.recommendationImageView?.image = image
+                if let imageData = data {
+                    let image = UIImage(data: imageData)
+                    DispatchQueue.main.async {
+                        cell.recommendationImageView?.image = image
+                    }
+                }
             }
         }
 
@@ -116,6 +123,6 @@ class RecommendationsViewController: UIViewController, UITableViewDataSource, UI
     }
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return 134
+        return UITableView.automaticDimension
     }
 }
