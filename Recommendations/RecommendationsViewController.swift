@@ -125,7 +125,7 @@ class RecommendationsViewController: UIViewController, UITableViewDataSource, UI
     }
     
     /// Filters and sorts an array of Recommendations to create the top ten.
-    /// Filters out already-owned and previously-skipped titles.
+    /// Filters out already-owned, previously-skipped, and unreleasedSorts and filters  titles.
     /// Sorts in descending order by rating.
     /// - Parameter rootObject: a root object parsed from JSON
     /// - Returns: A filtered and sorted top ten list of Recommendations
