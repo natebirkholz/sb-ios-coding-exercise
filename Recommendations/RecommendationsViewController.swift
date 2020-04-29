@@ -37,6 +37,7 @@ struct Recommendation: Codable {
 class RecommendationsViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
     
     @IBOutlet weak var tableView: UITableView!
+    @IBOutlet weak var activityIndicator: UIActivityIndicatorView!
     
     var recommendations = [Recommendation]()
     
@@ -56,36 +57,10 @@ class RecommendationsViewController: UIViewController, UITableViewDataSource, UI
         tableView.register(UINib(nibName: "RecommendationTableViewCell", bundle: nil), forCellReuseIdentifier: "Cell")
         tableView.dataSource = self
         tableView.delegate = self
-        
+        activityIndicator.hidesWhenStopped = true
+                
         loadRecommendationsFromStorage()
-        
-        // NOTE: please maintain the stubbed url we use here and the usage of
-        // a URLSession dataTask to ensure our stubbed response continues to
-        // work; however, feel free to reorganize/rewrite/refactor as needed
-        guard let url = URL(string: Stub.stubbedURL_doNotChange) else { fatalError() }
-        let request = URLRequest(url: url)
-        let session = URLSession(configuration: .default)
-
-        let task = session.dataTask(with: request, completionHandler: { (data, response, error) in
-            guard let receivedData = data else { return }
-
-            let jsonDecoder = JSONDecoder()
-
-            do {
-                let rootObject = try jsonDecoder.decode(RootObject.self, from: receivedData)
-                self.recommendations = self.filteredAndSortedRecommendationsFrom(rootObject)
-                self.saveRecommendationsToStorage()
-            } catch let error {
-                fatalError(error.localizedDescription)
-            }
-            
-            DispatchQueue.main.async {
-                self.tableView.reloadData()
-            }
-            
-        });
-
-        task.resume()
+        fetchRecommendationsFromServer()
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -96,7 +71,6 @@ class RecommendationsViewController: UIViewController, UITableViewDataSource, UI
         cell.titleLabel.text = recommendation.title
         cell.taglineLabel.text = recommendation.tagline
         cell.ratingLabel.text = "Rating: \(recommendation.rating ?? 0.0)"
-        cell.activityIndicator.hidesWhenStopped = true
         cell.activityIndicator.startAnimating()
         
         DispatchQueue.global().async {
@@ -124,12 +98,67 @@ class RecommendationsViewController: UIViewController, UITableViewDataSource, UI
         return UITableView.automaticDimension
     }
     
+    /// Fetches Recommendations JSON data from the server
+    private func fetchRecommendationsFromServer() {
+        guard let url = URL(string: Stub.stubbedURL_doNotChange) else {
+            let alertController = createErrorAlertController()
+            present(alertController, animated: true, completion: nil)
+            return
+        }
+        let request = URLRequest(url: url)
+        let session = URLSession(configuration: .default)
+        
+        if !(recommendations.count > 0) {
+            activityIndicator.startAnimating()
+        }
+        
+        let task = session.dataTask(with: request, completionHandler: { (data, response, error) in
+            guard let receivedData = data else {
+                DispatchQueue.main.async {
+                    self.activityIndicator.stopAnimating()
+                    let alertController = self.createErrorAlertController()
+                    self.present(alertController, animated: true, completion: nil)
+                }
+                return
+            }
+
+            let jsonDecoder = JSONDecoder()
+
+            do {
+                let rootObject = try jsonDecoder.decode(RootObject.self, from: receivedData)
+                self.recommendations = self.parseTopTenListFrom(rootObject)
+                self.saveRecommendationsToStorage()
+                DispatchQueue.main.async {
+                    self.tableView.reloadData()
+                    self.activityIndicator.stopAnimating()
+                }
+            } catch {
+                let alertController = self.createErrorAlertController()
+                DispatchQueue.main.async {
+                    self.activityIndicator.stopAnimating()
+                    self.present(alertController, animated: true, completion: nil)
+                }
+            }
+        });
+
+        task.resume()
+    }
+    
+    /// Creates a generic error message in a UIAlertController
+    /// - Returns: A UIAlertController with a generic error message
+    private func createErrorAlertController() -> UIAlertController {
+        let alertController = UIAlertController(title: "Error", message: "An error occurred when fetching recommendaions from the server.", preferredStyle: .alert)
+        let okAction = UIAlertAction(title: "OK", style: .default, handler: nil)
+        alertController.addAction(okAction)
+        return alertController
+    }
+    
     /// Filters and sorts an array of Recommendations to create the top ten.
     /// Filters out already-owned, previously-skipped, and unreleasedSorts and filters  titles.
     /// Sorts in descending order by rating.
     /// - Parameter rootObject: a root object parsed from JSON
     /// - Returns: A filtered and sorted top ten list of Recommendations
-    private func filteredAndSortedRecommendationsFrom(_ rootObject: RootObject) -> [Recommendation] {
+    private func parseTopTenListFrom(_ rootObject: RootObject) -> [Recommendation] {
         let filteredByReleased = rootObject.titles.filter { $0.isReleased }
         let filteredBySkipped = filteredByReleased.filter { !rootObject.skipped.contains($0.title) }
         let filteredByOwned = filteredBySkipped.filter { !rootObject.titlesOwned.contains($0.title) }

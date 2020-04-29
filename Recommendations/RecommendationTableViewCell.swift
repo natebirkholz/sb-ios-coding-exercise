@@ -16,4 +16,9 @@ class RecommendationTableViewCell: UITableViewCell {
         super.prepareForReuse()
         recommendationImageView.image = nil
     }
+    
+    override func awakeFromNib() {
+        super.awakeFromNib()
+        activityIndicator.hidesWhenStopped = true
+    }
 }
