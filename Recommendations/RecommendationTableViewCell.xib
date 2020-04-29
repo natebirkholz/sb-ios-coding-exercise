@@ -52,16 +52,21 @@
                             <constraint firstAttribute="height" constant="82" id="vkI-wK-UWr"/>
                         </constraints>
                     </imageView>
+                    <activityIndicatorView opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="750" verticalHuggingPriority="750" style="white" translatesAutoresizingMaskIntoConstraints="NO" id="6hh-Jk-86W">
+                        <rect key="frame" x="32" y="44" width="20" height="20"/>
+                    </activityIndicatorView>
                 </subviews>
                 <constraints>
                     <constraint firstAttribute="trailing" secondItem="wzc-gf-Zsp" secondAttribute="trailing" constant="12" id="AGa-nn-iLU"/>
                     <constraint firstAttribute="bottom" secondItem="ppr-WO-mOO" secondAttribute="bottom" constant="11" id="ASI-7L-uqD"/>
+                    <constraint firstItem="6hh-Jk-86W" firstAttribute="centerY" secondItem="RLN-6y-NzL" secondAttribute="centerY" id="B04-TS-Nix"/>
                     <constraint firstItem="ppr-WO-mOO" firstAttribute="top" secondItem="RLN-6y-NzL" secondAttribute="bottom" constant="8" id="Gdh-ZV-CrT"/>
                     <constraint firstItem="RLN-6y-NzL" firstAttribute="top" secondItem="H2p-sc-9uM" secondAttribute="top" constant="13" id="Lqi-7t-zPd"/>
                     <constraint firstItem="RLN-6y-NzL" firstAttribute="leading" secondItem="H2p-sc-9uM" secondAttribute="leading" constant="10" id="OC0-OA-oNJ"/>
                     <constraint firstItem="wzc-gf-Zsp" firstAttribute="top" secondItem="RGM-NW-tQd" secondAttribute="bottom" constant="2" id="PvM-gq-okM"/>
                     <constraint firstAttribute="trailing" secondItem="RGM-NW-tQd" secondAttribute="trailing" constant="12" id="cyi-GC-erM"/>
                     <constraint firstItem="RGM-NW-tQd" firstAttribute="leading" secondItem="RLN-6y-NzL" secondAttribute="trailing" constant="12" id="hdi-8c-ovE"/>
+                    <constraint firstItem="6hh-Jk-86W" firstAttribute="centerX" secondItem="RLN-6y-NzL" secondAttribute="centerX" id="kOY-fI-Anq"/>
                     <constraint firstItem="RGM-NW-tQd" firstAttribute="top" secondItem="H2p-sc-9uM" secondAttribute="top" constant="24" id="lnF-tc-8hL"/>
                     <constraint firstItem="wzc-gf-Zsp" firstAttribute="leading" secondItem="RLN-6y-NzL" secondAttribute="trailing" constant="12" id="m1d-28-TQv"/>
                     <constraint firstAttribute="trailing" secondItem="ppr-WO-mOO" secondAttribute="trailing" constant="12" id="p3P-QT-F0F"/>
@@ -70,6 +75,7 @@
             </tableViewCellContentView>
             <viewLayoutGuide key="safeArea" id="njF-e1-oar"/>
             <connections>
+                <outlet property="activityIndicator" destination="6hh-Jk-86W" id="gbc-vS-jT9"/>
                 <outlet property="ratingLabel" destination="wzc-gf-Zsp" id="dDC-bb-rCm"/>
                 <outlet property="recommendationImageView" destination="RLN-6y-NzL" id="C2m-Fn-5tX"/>
                 <outlet property="taglineLabel" destination="ppr-WO-mOO" id="PA8-9Q-U2R"/>

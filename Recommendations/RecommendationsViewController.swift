@@ -6,7 +6,7 @@
 import UIKit
 import OHHTTPStubs
 
-struct Root: Codable {
+struct RootObject: Codable {
     var titles: [Recommendation]
     var skipped: [String]
     var titlesOwned: [String]
@@ -40,6 +40,8 @@ class RecommendationsViewController: UIViewController, UITableViewDataSource, UI
     
     var recommendations = [Recommendation]()
     
+    static let recommendationsFileName = "recommendations.json"
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -55,6 +57,8 @@ class RecommendationsViewController: UIViewController, UITableViewDataSource, UI
         tableView.dataSource = self
         tableView.delegate = self
         
+        loadRecommendationsFromStorage()
+        
         // NOTE: please maintain the stubbed url we use here and the usage of
         // a URLSession dataTask to ensure our stubbed response continues to
         // work; however, feel free to reorganize/rewrite/refactor as needed
@@ -64,15 +68,13 @@ class RecommendationsViewController: UIViewController, UITableViewDataSource, UI
 
         let task = session.dataTask(with: request, completionHandler: { (data, response, error) in
             guard let receivedData = data else { return }
-            
+
             let jsonDecoder = JSONDecoder()
-            
+
             do {
-                let root = try jsonDecoder.decode(Root.self, from: receivedData)
-                
-                let filteredRecommendations = self.filteredAndSortedRecommendationsFrom(root)
-                
-                self.recommendations = filteredRecommendations
+                let rootObject = try jsonDecoder.decode(RootObject.self, from: receivedData)
+                self.recommendations = self.filteredAndSortedRecommendationsFrom(rootObject)
+                self.saveRecommendationsToStorage()
             } catch let error {
                 fatalError(error.localizedDescription)
             }
@@ -94,6 +96,8 @@ class RecommendationsViewController: UIViewController, UITableViewDataSource, UI
         cell.titleLabel.text = recommendation.title
         cell.taglineLabel.text = recommendation.tagline
         cell.ratingLabel.text = "Rating: \(recommendation.rating ?? 0.0)"
+        cell.activityIndicator.hidesWhenStopped = true
+        cell.activityIndicator.startAnimating()
         
         DispatchQueue.global().async {
             if let url = URL(string: recommendation.imageURL) {
@@ -103,6 +107,7 @@ class RecommendationsViewController: UIViewController, UITableViewDataSource, UI
                     let image = UIImage(data: imageData)
                     DispatchQueue.main.async {
                         cell.recommendationImageView?.image = image
+                        cell.activityIndicator.stopAnimating()
                     }
                 }
             }
@@ -119,15 +124,53 @@ class RecommendationsViewController: UIViewController, UITableViewDataSource, UI
         return UITableView.automaticDimension
     }
     
-    private func filteredAndSortedRecommendationsFrom(_ root: Root) -> [Recommendation] {
-        let filteredByReleased = root.titles.filter { $0.isReleased }
-        let filteredBySkipped = filteredByReleased.filter { !root.skipped.contains($0.title) }
-        let filteredByOwned = filteredBySkipped.filter { !root.titlesOwned.contains($0.title) }
+    /// Filters and sorts an array of Recommendations to create the top ten.
+    /// Filters out already-owned and previously-skipped titles.
+    /// Sorts in descending order by rating.
+    /// - Parameter rootObject: a root object parsed from JSON
+    /// - Returns: A filtered and sorted top ten list of Recommendations
+    private func filteredAndSortedRecommendationsFrom(_ rootObject: RootObject) -> [Recommendation] {
+        let filteredByReleased = rootObject.titles.filter { $0.isReleased }
+        let filteredBySkipped = filteredByReleased.filter { !rootObject.skipped.contains($0.title) }
+        let filteredByOwned = filteredBySkipped.filter { !rootObject.titlesOwned.contains($0.title) }
         let sorted = filteredByOwned.sorted { $0.rating ?? 0.0 > $1.rating ?? 0.0 }
         
         let topTen = Array(sorted.prefix(10))
         
         return topTen
-        
+    }
+    
+    /// Attempts to load an aray of Recomendations from the documents directory and
+    /// uses it as the recommendations property
+    private func loadRecommendationsFromStorage() {
+        let jsonDecoder = JSONDecoder()
+        if var url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            url.appendPathComponent(RecommendationsViewController.recommendationsFileName)
+            do {
+                let data = try Data(contentsOf: url)
+                let object = try jsonDecoder.decode(Array<Recommendation>.self, from: data)
+                self.recommendations = object
+                DispatchQueue.main.async {
+                    self.tableView.reloadData()
+                }
+            } catch let error {
+                print(error.localizedDescription)
+            }
+        }
+    }
+    
+    /// Attempts to save the current recommendations property to the documents directory
+    private func saveRecommendationsToStorage() {
+        let encoder = JSONEncoder()
+        if let encoded = try? encoder.encode(recommendations) {
+            if var url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                url.appendPathComponent(RecommendationsViewController.recommendationsFileName)
+                do {
+                    try encoded.write(to: url)
+                } catch let error {
+                    print(error.localizedDescription)
+                }
+            }
+        }
     }
 }
